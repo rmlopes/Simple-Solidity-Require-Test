@@ -1,44 +1,52 @@
 /* Testing with solidity tests. */
+pragma solidity ^0.5.0;
 
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
 import "../contracts/MyContract.sol";
 
+contract MyContractWrapper is MyContract{
+  function callStoreNum(uint num) public{
+    storeNum(num);
+  }
+}
+
 contract TestMyContract {
 
-function testInitialStoredValue() {
-    MyContract mycontract = new MyContract();
+  function testInitialStoredValue() public{
+      MyContract mycontract = new MyContractWrapper();
 
-    uint expected = 24;
+      uint expected = 24;
 
-    Assert.equal(mycontract.mynumber(), expected, "First number set should be 24.");
-}
+      Assert.equal(mycontract.mynumber(), expected, "First number set should be 24.");
+  }
 
-function testTheThrow() {
-    MyContract mycontract = new MyContract(); 
+  function testTheThrow() public{
+      MyContractWrapper mycontract = new MyContractWrapper(); 
 
-    ThrowProxy throwproxy = new ThrowProxy(address(mycontract)); 
+      ThrowProxy throwproxy = new ThrowProxy(address(mycontract)); 
 
-    MyContract(address(throwproxy)).storeNum(7);
+      MyContractWrapper(address(throwproxy)).callStoreNum(7);
 
-    bool r = throwproxy.execute.gas(200000)(); 
+      (bool r, ) = throwproxy.execute.gas(200000)(); 
 
-    Assert.isFalse(r, "Should be false because is should throw!");
+      Assert.isFalse(r, "Should be false because is should throw!");
+      Assert.equal(mycontract.mynumber(), 24, "Should not have changed");
 
-}
+  }
 
-function testNoThrow() {
-    MyContract mycontract = new MyContract(); 
+  function testNoThrow() public{
+      MyContract mycontract = new MyContractWrapper(); 
 
-    ThrowProxy throwproxy = new ThrowProxy(address(mycontract)); 
+      ThrowProxy throwproxy = new ThrowProxy(address(mycontract)); 
 
-    MyContract(address(throwproxy)).storeNum(22);
+      MyContractWrapper(address(throwproxy)).callStoreNum(22);
 
-    bool r = throwproxy.execute.gas(200000)(); 
+      (bool r, ) = throwproxy.execute.gas(200000)(); 
 
-    Assert.isTrue(r, "Should be true because is should throw!");
-
-}
+      Assert.isTrue(r, "Should be true because is should throw!");
+      Assert.equal(mycontract.mynumber(), 22, "Should have changed");
+  }
 
 }
 
@@ -47,16 +55,16 @@ contract ThrowProxy {
   address public target;
   bytes data;
 
-  function ThrowProxy(address _target) {
+  constructor(address _target) public{
     target = _target;
   }
 
   //prime the data using the fallback function.
-  function() {
+  function() external{
     data = msg.data;
   }
 
-  function execute() returns (bool) {
+  function execute() public returns (bool, bytes memory) {
     return target.call(data);
   }
 }
